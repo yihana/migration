@@ -1,15 +1,43 @@
 const axios = require('axios');
-const { notionToken, databaseId } = require('./config');
+require('dotenv').config();
 
-async function saveToNotion(title, content) {
+const notionToken = process.env.NOTION_TOKEN;
+const databaseId = process.env.NOTION_DATABASE_ID;
+
+async function saveToNotion(title, content, url, publishDate, migrationDate) {
   try {
+    const safeContent = (content && content.trim()) ? content.trim().slice(0, 2000) : "No content available.";
+    const safeTitle = title || "Untitled";
+    const safePublishDate = publishDate || new Date().toISOString().split('T')[0];
+    const safeMigrationDate = migrationDate || new Date().toISOString().split('T')[0];
+    const safeUrl = url || "https://example.com";  // ✅ 혹시 몰라 기본 URL 설정
+
     const response = await axios.post(
       'https://api.notion.com/v1/pages',
       {
         parent: { database_id: databaseId },
         properties: {
           Name: {
-            title: [{ text: { content: title } }]
+            title: [
+              {
+                text: {
+                  content: safeTitle
+                }
+              }
+            ]
+          },
+          PublishDate: {
+            date: {
+              start: safePublishDate
+            }
+          },
+          MigrationDate: {
+            date: {
+              start: safeMigrationDate
+            }
+          },
+          URL: {
+            url: safeUrl   // ✅ 정확히 'url' 타입에 safeUrl 대입
           }
         },
         children: [
@@ -17,7 +45,14 @@ async function saveToNotion(title, content) {
             object: 'block',
             type: 'paragraph',
             paragraph: {
-              text: [{ type: 'text', text: { content: content } }]
+              rich_text: [
+                {
+                  type: 'text',
+                  text: {
+                    content: safeContent
+                  }
+                }
+              ]
             }
           }
         ]
@@ -33,7 +68,7 @@ async function saveToNotion(title, content) {
 
     console.log('✅ Notion 저장 성공:', title);
   } catch (error) {
-    console.error('❌ Notion 저장 실패:', error.response.data);
+    console.error('❌ Notion 저장 실패:', error.response?.data || error.message);
   }
 }
 

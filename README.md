@@ -17,3 +17,9 @@ node_modules (용량 큰 모듈 폴더)
 .vscode (개인 에디터 설정)
 *.log (로그파일)
 .DS_Store (Mac 사용 시 자동 생성되는 파일)
+
+migrate.js 실행
+ → cleanDatabase() 실행 (기존 데이터 모두 삭제)
+ → fetchBlogDataFromRSS() 실행 (링크 + 게시날짜 가져오기)
+ → extractBlogContent() 실행 (본문 가져오기)
+ → saveToNotion() 저장 (제목, 게시날짜, 실행날짜, URL 저장)
