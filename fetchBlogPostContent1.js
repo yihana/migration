@@ -1,60 +1,46 @@
 const fs = require('fs');
-const puppeteer = require('puppeteer');
+const axios = require('axios');
+const { JSDOM } = require('jsdom');
 
-async function fetchContent(url) {
-const browser = await puppeteer.launch({
-headless: true,
-args: ['--no-sandbox', '--disable-setuid-sandbox']
-});
-const page = await browser.newPage();
-
+async function extractPostContent(url) {
 try {
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+const { data } = await axios.get(url, {
+headers: {
+'User-Agent': 'Mozilla/5.0',
+},
+});
 
-// 본문 추출 가능한 다양한 후보 셀렉터
-const selectors = [
-  'div.se-main-container',
-  'div.post_ct', // 예전 블로그
-  'div#postViewArea',
-  'div.view',
-  'div.post-view-content',
-  'div.se_component_wrap'
-];
+const dom = new JSDOM(data);
+const document = dom.window.document;
 
-let content = null;
-for (const selector of selectors) {
-  const exists = await page.$(selector);
-  if (exists) {
-    content = await page.$eval(selector, el => el.innerText.trim());
-    break;
-  }
-}
+const title = document.querySelector('title')?.textContent.trim() || '제목 없음';
+const paragraphs = Array.from(document.querySelectorAll('p')).map(p => p.textContent.trim());
+const content = paragraphs.join('\\n').slice(0, 5000); // 글 길이 제한
 
-if (!content) throw new Error('본문 요소를 찾을 수 없습니다.');
-
-return content;
+return { url, title, content };
 
 } catch (error) {
-console.error(`❌ 오류 발생 [${url}]: ${error.message}`);
+console.error(`❌ ${url} 처리 실패:`, error.message);
 return null;
-} finally {
-await browser.close();
 }
 }
 
-async function processAll() {
+async function run() {
+try {
 const urls = fs.readFileSync('mobile_links.txt', 'utf-8').split('\n').filter(Boolean);
-const result = [];
+const results = [];
 
-for (let i = 0; i < urls.length; i++) {
-const url = urls[i];
-console.log(`🔍 (${i + 1}/${urls.length}) 처리 중: ${url}`);
-const content = await fetchContent(url);
-if (content) result.push({ url, content });
+for (const url of urls) {
+  const post = await extractPostContent(url);
+  if (post) results.push(post);
 }
 
-fs.writeFileSync('postContents.json', JSON.stringify(result, null, 2));
-console.log(`✅ 총 ${result.length}개의 본문 수집 완료`);
+fs.writeFileSync('postContents1.json', JSON.stringify(results, null, 2));
+console.log(`✅ 총 ${results.length}건 저장 완료 (postContents1.json)`);
+
+} catch (err) {
+console.error('❌ 파일 처리 실패:', err.message);
+}
 }
 
-processAll();
+run();

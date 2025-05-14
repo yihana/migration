@@ -1,11 +1,22 @@
-const { Client } = require('@notionhq/client');
 const fs = require('fs');
+const { Client } = require('@notionhq/client');
 require('dotenv').config();
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const databaseId = process.env.NOTION_DATABASE_ID;
 
-async function createPage(post) {
+async function readPostContents() {
+try {
+const data = fs.readFileSync('postContents1.json', 'utf-8');
+return JSON.parse(data);
+} catch (error) {
+console.error('❌ postContents1.json 읽기 실패:', error.message);
+return [];
+}
+}
+
+async function saveToNotion(posts) {
+for (const [index, post] of posts.entries()) {
 try {
 await notion.pages.create({
 parent: { database_id: databaseId },
@@ -14,10 +25,13 @@ Name: {
 title: [
 {
 text: {
-content: post.title || '(제목 없음)',
+content: post.title || `포스트 ${index + 1}`,
 },
 },
 ],
+},
+URL: {
+url: post.url,
 },
 },
 children: [
@@ -29,7 +43,7 @@ rich_text: [
 {
 type: 'text',
 text: {
-content: post.content.slice(0, 2000), // Notion 블럭은 길이 제한 있음
+content: post.content.slice(0, 2000), // 최대 2000자
 },
 },
 ],
@@ -37,35 +51,19 @@ content: post.content.slice(0, 2000), // Notion 블럭은 길이 제한 있음
 },
 ],
 });
-console.log(`✅ 업로드 완료: ${post.title}`);
+console.log(`✅ 저장됨: ${post.title}`);
 } catch (error) {
-console.error(`❌ 업로드 실패: ${post.title}`, error.message);
+console.error(`❌ 저장 실패 (${post.title}):`, error.message);
+}
 }
 }
 
-async function uploadPosts() {
-const filePath = './postContents.json';
-
-if (!fs.existsSync(filePath)) {
-console.error('❌ postContents.json 파일이 존재하지 않습니다.');
+(async () => {
+const posts = await readPostContents();
+if (posts.length === 0) {
+console.log('❗ 저장할 데이터가 없습니다.');
 return;
 }
-
-const rawData = fs.readFileSync(filePath);
-let posts;
-
-try {
-posts = JSON.parse(rawData);
-} catch (err) {
-console.error('❌ JSON 파싱 실패:', err);
-return;
-}
-
-console.log(`📦 총 ${posts.length}개의 포스트를 Notion으로 업로드 시작`);
-for (const post of posts) {
-await createPage(post);
-}
-console.log('🏁 전체 업로드 완료');
-}
-
-uploadPosts();
+console.log(`🚀 ${posts.length}개의 포스트를 Notion에 저장합니다...`);
+await saveToNotion(posts);
+})();
