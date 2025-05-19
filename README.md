@@ -1,4 +1,4 @@
-# migration
+git # migration
 /migration v0.1.0
   ├── extractBlog.js   (네이버 블로그 글 추출하는 코드)
   ├── saveToNotion.js  (Notion에 저장하는 코드)
